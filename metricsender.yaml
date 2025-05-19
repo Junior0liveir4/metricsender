@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metricsender-config
+data:
+  metricsender.yaml: |
+    connection:
+      uri: "amqp://rabbitmq:30000"
+
+    deployments:
+      - name: RGB2Gray
+        metrics:
+          cpu: [50m, 100m, 150m, 200m]
+          memory: [64Mi, 128Mi, 256Mi]
+          replicas: [1, 2, 3]
+
+      - name: Blur
+        metrics:
+          cpu: [200m, 400m, 600m]
+          memory: [256Mi, 512Mi, 1024Mi]
+          replicas: [2, 3]
+
+      - name: EdgeDetection
+        metrics:
+          cpu: [100m, 200m, 300m]
+          memory: [128Mi, 256Mi]
+          replicas: [1, 2]
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metricsender
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metricsender
+  template:
+    metadata:
+      labels:
+        app: metricsender
+    spec:
+      containers:
+      - name: metricsender
+        image: juniorgui/metricsender:v06
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+          readOnly: true
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+      volumes:
+      - name: config-volume
+        configMap:
+          name: metricsender-config
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: metricsender
+spec:
+  selector:
+    app: metricsender
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
